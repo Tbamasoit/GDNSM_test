@@ -182,9 +182,9 @@ class Diffusion_CFG(nn.Module):
             self.timesteps = timesteps
 
         # cfg scale
-        self.v_cfg_scale = cfg_dict.get('cfg_scale_text', 1.0)
-        self.t_cfg_scale = cfg_dict.get('cfg_scale_text', 1.0)
-        self.vt_cfg_scale = cfg_dict.get('cfg_scale_text', 1.0)
+        self.v_cfg_scale = cfg_dict.get('cfg_scale_visual', 1.1)
+        self.t_cfg_scale = cfg_dict.get('cfg_scale_text', 1.1)
+        self.vt_cfg_scale = (self.v_cfg_scale + self.t_cfg_scale) / 2
 
         # 初始化 Encoder
         self.encoder = Encoder_CFG(config, in_feat, out_feat, v_dim, t_dim)

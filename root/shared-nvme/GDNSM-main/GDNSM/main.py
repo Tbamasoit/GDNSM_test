@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     # 数据集相关
     'dataset': 'baby',
-    'data_path': '/home/ma-user/work/GDNSM_UFNRec/root/shared-nvme/GDNSM-main/GDNSM/dataset/',
+    'data_path': 'root/shared-nvme/GDNSM-main/GDNSM/dataset/',
     'inter_file_name': 'baby.inter',
     'USER_ID_FIELD': 'userID',
     'ITEM_ID_FIELD': 'itemID',
@@ -74,8 +74,8 @@ if __name__ == '__main__':
     'field_separator': '\t',
     'filter_out_cod_start_users': True,
     'NEG_PREFIX': 'neg_',
-    'text_feat_file': '/home/ma-user/work/GDNSM_UFNRec/root/shared-nvme/GDNSM-main/GDNSM/dataset/baby/text_feat.npy',
-    'image_feat_file': '/home/ma-user/work/GDNSM_UFNRec/root/shared-nvme/GDNSM-main/GDNSM/dataset/baby/image_feat.npy',
+    'text_feat_file': 'root/shared-nvme/GDNSM-main/GDNSM/dataset/baby/text_feat.npy',
+    'image_feat_file': 'root/shared-nvme/GDNSM-main/GDNSM/dataset/baby/image_feat.npy',
 
     # 训练/评估
     'train_batch_size': 2048,

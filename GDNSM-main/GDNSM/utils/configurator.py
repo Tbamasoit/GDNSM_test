@@ -139,3 +139,9 @@ class Config(object):
 
     def __repr__(self):
         return self.__str__()
+    
+    def get(self, key, default=None):
+        """
+        Safe get method, behaves like dict.get()
+        """
+        return self.final_config_dict.get(key, default)

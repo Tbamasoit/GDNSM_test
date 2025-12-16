@@ -28,26 +28,26 @@ class Trainer:
         self.logger = getLogger()
 
         # 配置参数
-        self.learner = getattr(config, 'learner', 'adam')
-        self.learning_rate = getattr(config, 'learning_rate', 0.001)
-        self.epochs = getattr(config, 'epochs', 100)
-        self.eval_step = min(getattr(config, 'eval_step', 1), self.epochs)
-        self.stopping_step = getattr(config, 'stopping_step', 10)
-        self.clip_grad_norm = getattr(config, 'clip_grad_norm', None)
-        self.valid_metric = getattr(config, 'valid_metric', 'NDCG@20').lower()
-        self.valid_metric_bigger = getattr(config, 'valid_metric_bigger', True)
-        self.test_batch_size = getattr(config, 'eval_batch_size', 128)
-        self.device = getattr(config, 'device', 'cpu')
-        self.weight_decay = getattr(config, 'weight_decay', 0.0)
+        self.learner = config.get('learner', 'adam')
+        self.learning_rate = config.get('learning_rate', 0.001)
+        self.epochs = config.get('epochs', 100)
+        self.eval_step = min(config.get('eval_step', 1), self.epochs)
+        self.stopping_step = config.get('stopping_step', 10)
+        self.clip_grad_norm = config.get('clip_grad_norm', None)
+        self.valid_metric = config.get('valid_metric', 'NDCG@20').lower()
+        self.valid_metric_bigger = config.get('valid_metric_bigger', True)
+        self.test_batch_size = config.get('eval_batch_size', 128)
+        self.device = config.get('device', 'cuda')
+        self.weight_decay = config.get('weight_decay', 0.0)
         if isinstance(self.weight_decay, str):
             self.weight_decay = eval(self.weight_decay)
 
-        self.req_training = getattr(config, 'req_training', True)
+        self.req_training = config.get('req_training', True)
         self.start_epoch = 0
         self.cur_step = 0
 
         tmp_dd = {f'{j.lower()}@{k}': 0.0 for j, k in itertools.product(
-            getattr(config, 'metrics', ['NDCG']), getattr(config, 'topk', [20])
+            config.get('metrics', ['NDCG']), config.get('topk', [20])
         )}
         self.best_valid_score = -1
         self.best_valid_result = tmp_dd
@@ -68,20 +68,21 @@ class Trainer:
         self.opt_theta = optim.Adam(theta_params, lr=self.learning_rate, weight_decay=self.weight_decay)
 
         # === 各自配一个 scheduler ===
-        lr_scheduler = getattr(config, 'learning_rate_scheduler', [0.96, 50])
+        lr_scheduler = config.get('learning_rate_scheduler', [0.96, 50])
         fac = lambda epoch: lr_scheduler[0] ** (epoch / lr_scheduler[1])
 
         self.lr_phi = optim.lr_scheduler.LambdaLR(self.opt_phi, lr_lambda=fac)
         self.lr_theta = optim.lr_scheduler.LambdaLR(self.opt_theta, lr_lambda=fac)
 
 
-        self.eval_type = getattr(config, 'eval_type', 'full')
+        self.eval_type = config.get('eval_type', 'full')
         self.evaluator = TopKEvaluator(config)
 
         # GDNSM 多目标训练参数
-        self.alpha1 = getattr(config, 'alpha1', 1.0)
-        self.alpha2 = getattr(config, 'alpha2', 1.0)
-        self.beta = getattr(config, 'beta', 1)
+        self.alpha1 = config.get('alpha1', 1.0)
+        self.alpha2 = config.get('alpha2', 1.0)
+        self.beta = config.get('beta', 1)
+        self.gamma = config.get('gamma',1)
 
         # ==========================================
         # # [新增] UFNRec 模块初始化
@@ -121,12 +122,21 @@ class Trainer:
         self.writer = SummaryWriter(log_dir=log_dir)
         print(f"TensorBoard log directory: {log_dir}")
         # ==========================================
-
+        #__getitem__
         # ================= [UFNRec Init] =================
-        self.ufn_warmup = getattr(config, 'ufn_warmup', 5) # 热身 Epoch
-        self.ufn_m = getattr(config, 'reverse', 2)         # 阈值 m
-        self.ufn_alpha = getattr(config, 'lbd', 0.3)       # Consistency Loss 权重
-        self.ufn_decay = getattr(config, 'decay', 0.999)   # EMA decay
+        self.ufn_warmup = config.get('ufn_warmup', 5) # 热身 Epoch
+        self.ufn_m = config.get('reverse', 2)        # 阈值 m
+        self.ufn_alpha = config.get('lbd', 0.3)       # Consistency Loss 权重
+        self.ufn_decay = config.get('decay', 0.999)   # EMA decay
+
+        # [GDNSM 扩散模型参数 - 修复此处]后面从self.config中导入
+        # self.sched_S = config.get('sched_S', 30) 
+        # self.sched_lambda = config.get('sched_lambda', 1)
+        # self.num_M = config.get('num_M', 5)
+        
+        # [新增] 读取 d_epoch 和 use_mm_diff
+        self.d_epoch = config.get('d_epoch', 1)       # 默认训练 5 次
+        self.use_mm_diff = config.get('use_mm_diff', True) # 默认开启
 
         # [优化1] 使用 EMA 对象，而不是 Teacher Model
         # 注意：这里只追踪 phi (MCI Encoder) 的参数，不追踪 diffusion
@@ -177,7 +187,7 @@ class Trainer:
             scores = self.model.full_sort_predict(batch)
             masked_items = batch[1]
             scores[masked_items[0], masked_items[1]] = -1e10
-            _, topk_index = torch.topk(scores, max(getattr(self.config, 'topk', [20])), dim=-1)
+            _, topk_index = torch.topk(scores, max(self.config.get('topk', [20])), dim=-1)
             batch_matrix_list.append(topk_index)
         return self.evaluator.evaluate(batch_matrix_list, eval_data, is_test=is_test)
 
@@ -322,10 +332,14 @@ class Trainer:
         return total_loss / len(train_data)
 
     def _train_epoch_theta(self, train_data, epoch):
+        # 1. 如果配置关闭了扩散模型，直接返回 0 Loss
+        if not self.use_mm_diff:
+            return 0.0
+        
         self.model.train()
         total_loss = 0.0
 
-        # φ 冻结
+        # φ (Encoder) 冻结，只训练 θ (Diffusion)
         for p in self.model.parameters():
             p.requires_grad = False
         for p in self.model.diffusion_MM.parameters():
@@ -334,19 +348,30 @@ class Trainer:
         for batch in train_data:
             users, pos_items = batch[0], batch[1]
 
+            # 预先计算条件 Embedding (因为 Encoder 被冻结了，这部分对于 d_epoch 循环是固定的)
+            # 放在循环外可以稍微节省一点点计算量
             with torch.no_grad():
                 ua_embeddings, ia_embeddings, _, _ = self.model.forward(self.model.norm_adj, train=True)
                 u_g = ua_embeddings[users]
                 x0 = ia_embeddings[pos_items]
+
+                # 获取多模态特征作为条件
                 t_cond = self.model.text_trs(self.model.text_feat[pos_items])
                 v_cond = self.model.image_trs(self.model.image_feat[pos_items])
                 labels = torch.cat([u_g, t_cond, v_cond], dim=1)
 
-            diff_loss = self.model.diffusion_MM(x0, labels, device=x0.device)
-            self.opt_theta.zero_grad()
-            diff_loss.backward()
-            self.opt_theta.step()
-            total_loss += diff_loss.item()
+            # [关键修复] 启用 d_epoch 循环
+            # 对当前 Batch 反复训练 d_epoch 次
+            for _ in range(self.d_epoch):
+                # 注意：虽然 x0 和 labels 是一样的，但 diffusion_MM 内部会随机采样不同的 timestep t 和噪声
+                # 所以这多次训练是有意义的
+                diff_loss = self.model.diffusion_MM(x0, labels, device=x0.device)
+                
+                self.opt_theta.zero_grad()
+                diff_loss.backward()
+                self.opt_theta.step()
+                
+                total_loss += diff_loss.item()
 
         # 解冻回来
         for p in self.model.parameters():
@@ -354,7 +379,8 @@ class Trainer:
         for p in self.model.diffusion_MM.parameters():
             p.requires_grad = False
 
-        return total_loss / len(train_data)
+        # 计算平均 Loss (总 Loss / (Batch数 * d_epoch))
+        return total_loss / (len(train_data) * self.d_epoch)
 
     def _train_epoch_joint(self, train_data, epoch):
         self.model.train()
@@ -376,9 +402,9 @@ class Trainer:
         cos_sim_tvneg_list = []
 
         # 动态难度调度参数
-        S = getattr(self.config, 'sched_S', 30)        # pacing 参数 S
-        lam = getattr(self.config, 'sched_lambda', 1)  # pacing 参数 λ
-        M = getattr(self.config, 'num_M', 5)           # 基础负样本数 (总共 3M)
+        S = self.config.get('smoothing_S', 10)        # pacing 参数 S
+        lam = self.config.get('lambda_ds', 1)  # pacing 参数 λ
+        M = self.config.get('num_generated_neg', 3)           # 基础负样本数 (总共 3M)
 
         def g(ep):
             if ep < S:
@@ -592,7 +618,7 @@ class Trainer:
 
             # 总损失
             # [修改] 加入 UFNRec 的 loss
-            total = bpr_mf + bpr_emb + bpr_reg + 0.01* cl_loss + L_NEG + loss_ufn
+            total = bpr_mf + bpr_emb + bpr_reg + 0.01* cl_loss + self.beta * L_NEG + self.gamma * loss_ufn
                     
             self.opt_phi.zero_grad()
             total.backward()
@@ -766,7 +792,7 @@ class Trainer:
             self.best_valid_result = valid_result
             self.best_test_upon_valid = test_result
             if saved:
-                save_path = f'best_model_{getattr(self.config, "model", "GDNSM")}.pth'
+                save_path = f'best_model_{self.config.get("model", "GDNSM")}.pth'
                 torch.save(self.model.state_dict(), save_path)
                 self.logger.info(f'Best model saved to {save_path}')
 
@@ -774,6 +800,9 @@ class Trainer:
             self.logger.info(f"Epoch {epoch} | Valid: {valid_score:.4f}")
             if test_result:
                 self.logger.info(f"Test Result: {dict2str(test_result)}")
+        # [修改] 返回是否变得更好 (True/False)
+        return is_better
+    
     def fit(self, train_data, valid_data=None, test_data=None, saved=True, verbose=True):
         """
         每个 epoch 都执行三个阶段:
@@ -781,9 +810,13 @@ class Trainer:
         2. 更新扩散模型 θ (φ 冻结)
         3. 联合训练 (θ 固定, φ 更新, 生成负样本)
         """
-        E = getattr(self.config, 'total_epochs', 100)  # 总 epoch 数
+        E = self.config.get('total_epochs', 100)  # 总 epoch 数
         self.best_valid_score = -1e9 if self.valid_metric_bigger else 1e9
         self.best_valid_result, self.best_test_upon_valid = {}, {}
+
+        # [早停参数]
+        patience = self.stopping_step  # 从 config 读取，默认通常是 10 或 20
+        wait = 0                       # 忍耐计数器
 
         print(f"\n===> 开始联合训练 (每个 epoch 包含 3 个阶段)，总轮数 {E}")
 
@@ -807,7 +840,22 @@ class Trainer:
 
             # 验证
             if valid_data and (epoch + 1) % self.eval_step == 0:
-                self._do_validation(epoch, valid_data, test_data, saved, verbose)
+                # 接收返回值：是否变好了？
+                is_better = self._do_validation(epoch, valid_data, test_data, saved, verbose)
+                
+                if is_better:
+                    wait = 0  # 破纪录了，重置忍耐值
+                else:
+                    wait += 1 # 没破纪录，忍耐值 +1
+                    if verbose:
+                        print(f"   [EarlyStopping] Patience: {wait}/{patience}")
+
+                # 3. 触发早停
+                if wait >= patience:
+                    print(f"\n🛑 触发早停 (Early Stopping)！在连续 {patience} 个 Epoch 内验证集指标未提升。")
+                    print(f"最佳验证集得分: {self.best_valid_score:.4f}")
+                    break
+
 
         print("\n===> 训练完成 ✅")
         return self.best_valid_score, self.best_valid_result, self.best_test_upon_valid
