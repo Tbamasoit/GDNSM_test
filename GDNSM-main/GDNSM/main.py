@@ -16,7 +16,7 @@ if __name__ == '__main__':
     # ==========================================
     # [新增] UFNRec 核心超参数
     # ==========================================
-    parser.add_argument('--reverse', type=int, default=100, help='UFNRec: 判定 FN 的阈值 m (连续多少次高分)')
+    parser.add_argument('--reverse', type=int, default=1, help='UFNRec: 判定 FN 的阈值 m (连续多少次高分)')
     parser.add_argument('--lbd', type=float, default=0.5, help='UFNRec: Consistency Loss 的权重 alpha')
     parser.add_argument('--decay', type=float, default=0.999, help='UFNRec: EMA Teacher 的衰减率')
     parser.add_argument('--ufn_warmup', type=int, default=3, help='UFNRec: 热身 Epoch 数，在此之前不开启挖掘')
@@ -25,7 +25,8 @@ if __name__ == '__main__':
     parser.add_argument('--d_epoch', type=int, default=1, help='DM在一个epoch生成负样本训练的轮数，生成更难的样本')
     parser.add_argument('--beta', type=float, default=1, help='难负样本Loss的权重')
     parser.add_argument('--num_generated_neg', type=int, default=5, help='DM在一个epoch生成负样本训练的轮数，生成更难的样本')
-    parser.add_argument('--smoothing_S', type=float, default=30, help='DM什么时候介入')
+    parser.add_argument('--smoothing_S', type=float, default=10, help='DM什么时候介入')
+    parser.add_argument('--gamma', type=float, default=0, help='开不开ufn')
     
 
 
@@ -44,6 +45,8 @@ if __name__ == '__main__':
     'lbd': args.lbd,
     'decay': args.decay,
     'ufn_warmup': args.ufn_warmup,
+
+    'gamma': args.gamma,
     
     # ==========================================
     'd_epoch' : args.d_epoch,
@@ -51,10 +54,10 @@ if __name__ == '__main__':
     'num_generated_neg':args.num_generated_neg,    # 每个正样本生成负样本数量
     'smoothing_S': args.smoothing_S, 
 
-    'gamma': 0,     #ufn参与程度
+    # 'gamma': 1,     #ufn参与程度
     # 基本训练参数
     'learning_rate_scheduler': [0.96, 50],
-    'stopping_step': 25,
+    'stopping_step': 20,
     'clip_grad_norm': None,          #{'max_norm': 5.0},
     'req_training': True,
     'eval_type': 'full',
@@ -64,7 +67,7 @@ if __name__ == '__main__':
 
     # 模型相关
     'cl_loss': 1.0,
-    'knn_k': 10,        #20
+    'knn_k': 20,        #20
     'embedding_size': 64,
     'n_ui_layers': 2,          # User-Item GCN 层数
     'n_layers': 2,             # Item-Item GCN 层数
