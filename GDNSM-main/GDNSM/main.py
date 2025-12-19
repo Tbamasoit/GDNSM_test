@@ -5,7 +5,15 @@ from GDNSM.utils.quick_start import quick_start
 import torch.utils.tensorboard as tb
 os.environ['NUMEXPR_MAX_THREADS'] = '48'
 
-
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -27,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_generated_neg', type=int, default=5, help='DM在一个epoch生成负样本训练的轮数，生成更难的样本')
     parser.add_argument('--smoothing_S', type=float, default=10, help='DM什么时候介入')
     parser.add_argument('--gamma', type=float, default=0, help='开不开ufn')
+    parser.add_argument('--use_mm_diff', type=str2bool, default=True, help='开不开DM')
     
 
 
@@ -48,11 +57,14 @@ if __name__ == '__main__':
 
     'gamma': args.gamma,
     
+    
     # ==========================================
     'd_epoch' : args.d_epoch,
     'beta': args.beta,
     'num_generated_neg':args.num_generated_neg,    # 每个正样本生成负样本数量
     'smoothing_S': args.smoothing_S, 
+
+    'use_mm_diff' : args.use_mm_diff,   #True
 
     # 'gamma': 1,     #ufn参与程度
     # 基本训练参数
@@ -74,7 +86,7 @@ if __name__ == '__main__':
     'reg_weight': 1e-4,        # BPR正则权重
 
     # diffusion 模型参数
-    'use_mm_diff' : True,      #True
+    
     # 'd_epoch' : 1,
     'timesteps': 5,           # diffusion 步数 T 5
     # 'beta': 1,

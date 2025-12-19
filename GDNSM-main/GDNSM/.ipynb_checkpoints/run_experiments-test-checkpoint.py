@@ -63,17 +63,43 @@ def run():
         # },
         # #-------测试一下gamma的值
 
-        # 第 2 组实验：我想试小一点的 beta 和 5 个负样本
         {
-            'reverse': 1, 'lbd': 0.5, 'ufn_warmup': 3, 'decay': 0.999, 
-            'smoothing_S': 10, 'num_generated_neg': 3, 'd_epoch': 3, 'beta': 1,'gamma':1
+            
+            'smoothing_S': 30, 'num_generated_neg': 5, 'd_epoch': 1, 'beta': 1,'gamma':0
         },
 
         # 第 2 组实验：我想试小一点的 beta 和 5 个负样本
         {
-            'reverse': 1, 'lbd': 1.0, 'ufn_warmup': 3, 'decay': 0.999, 
-            'smoothing_S': 10, 'num_generated_neg': 3, 'd_epoch': 3, 'beta': 1,'gamma':1
+            
+            'smoothing_S': 30, 'num_generated_neg': 3, 'd_epoch': 1, 'beta': 1,'gamma':0
         },
+
+        {
+            
+            'smoothing_S': 30, 'num_generated_neg': 1, 'd_epoch': 1, 'beta': 1,'gamma':0
+        },
+
+        {
+            
+            'smoothing_S': 20, 'num_generated_neg': 5, 'd_epoch': 1, 'beta': 1,'gamma':0
+        },
+
+        {
+            
+            'smoothing_S': 20, 'num_generated_neg': 3, 'd_epoch': 1, 'beta': 1,'gamma':0
+        },
+
+        {
+            
+            'smoothing_S': 20, 'num_generated_neg': 1, 'd_epoch': 1, 'beta': 1,'gamma':0
+        },
+
+        {
+            
+            'smoothing_S': 10, 'num_generated_neg': 5, 'd_epoch': 1, 'beta': 1,'gamma':0
+        },
+        
+       
 
         
         # ... 你可以继续添加任意多组 ...

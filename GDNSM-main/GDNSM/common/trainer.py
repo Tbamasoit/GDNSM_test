@@ -129,10 +129,7 @@ class Trainer:
         self.ufn_alpha = config.get('lbd', 0.3)       # Consistency Loss 权重
         self.ufn_decay = config.get('decay', 0.999)   # EMA decay
 
-        # [GDNSM 扩散模型参数 - 修复此处]后面从self.config中导入
-        # self.sched_S = config.get('sched_S', 30) 
-        # self.sched_lambda = config.get('sched_lambda', 1)
-        # self.num_M = config.get('num_M', 5)
+        
         
         # [新增] 读取 d_epoch 和 use_mm_diff
         self.d_epoch = config.get('d_epoch', 1)       # 默认训练 5 次
@@ -401,6 +398,11 @@ class Trainer:
         cos_sim_tneg_list = []
         cos_sim_tvneg_list = []
 
+        # [GDNSM 扩散模型参数 - 修复此处]后面从self.config中导入
+        # self.sched_S = config.get('sched_S', 30) 
+        # self.sched_lambda = config.get('sched_lambda', 1)
+        # self.num_M = config.get('num_M', 5)
+        
         # 动态难度调度参数
         S = self.config.get('smoothing_S', 10)        # pacing 参数 S
         lam = self.config.get('lambda_ds', 1)  # pacing 参数 λ
@@ -574,47 +576,54 @@ class Trainer:
             cl_loss = self.model.InfoNCE(side_i[pos_items], cont_i[pos_items], 0.2) + \
                     self.model.InfoNCE(side_u[users], cont_u[users], 0.2)
 
-            # θ 生成负样本 (固定 θ)
-            with torch.no_grad():
-                t_cond = self.model.text_trs(self.model.text_feat[pos_items])
-                v_cond = self.model.image_trs(self.model.image_feat[pos_items])
-                labels_gen = torch.cat([u_g, t_cond, v_cond], dim=1)
+            # ==========================================
+            # [修复] Diffusion 生成负样本 (加上开关控制)
+            # ==========================================
+            L_NEG = torch.tensor(0.0, device=self.device) # 默认 Loss 为 0
 
-                # 三种生成负样本
-                O_v_all, O_t_all, O_tv_all = [], [], []
-                for _ in range(M):
-                    O_v_all.append(self.model.diffusion_MM.sample(pos_g.shape, labels_gen, flag=1)[-1])
-                    O_t_all.append(self.model.diffusion_MM.sample(pos_g.shape, labels_gen, flag=2)[-1])
-                    O_tv_all.append(self.model.diffusion_MM.sample(pos_g.shape, labels_gen, flag=3)[-1])
+            # 只有当开关开启，且 beta > 0 时才生成，省时间又省显存
+            if self.use_mm_diff and self.beta > 0:
+                # θ 生成负样本 (固定 θ)
+                with torch.no_grad():
+                    t_cond = self.model.text_trs(self.model.text_feat[pos_items])
+                    v_cond = self.model.image_trs(self.model.image_feat[pos_items])
+                    labels_gen = torch.cat([u_g, t_cond, v_cond], dim=1)
 
-
-            with torch.no_grad(): 
-                # 计算余弦相似度
-                u_norm = F.normalize(u_g, dim=1)             # [B, D]
-                pos_norm = F.normalize(pos_g, dim=1)
-                for vneg, tneg, tvneg in zip(O_v_all, O_t_all, O_tv_all):
-                    vneg_norm = F.normalize(vneg, dim=1)
-                    tneg_norm = F.normalize(tneg, dim=1)
-                    tvneg_norm = F.normalize(tvneg, dim=1)
-                    cos_sim_pos_list.extend((u_norm * pos_norm).sum(dim=1).cpu().numpy())
-                    cos_sim_vneg_list.extend((u_norm * vneg_norm).sum(dim=1).cpu().numpy())
-                    cos_sim_tneg_list.extend((u_norm * tneg_norm).sum(dim=1).cpu().numpy())
-                    cos_sim_tvneg_list.extend((u_norm * tvneg_norm).sum(dim=1).cpu().numpy())
-
-            # 动态难度调度
-            Q_diff = O_v_all + O_t_all + O_tv_all
-            Q_diff = Q_diff[:g(epoch+1)]
+                    # 三种生成负样本
+                    O_v_all, O_t_all, O_tv_all = [], [], []
+                    for _ in range(M):
+                        O_v_all.append(self.model.diffusion_MM.sample(pos_g.shape, labels_gen, flag=1)[-1])
+                        O_t_all.append(self.model.diffusion_MM.sample(pos_g.shape, labels_gen, flag=2)[-1])
+                        O_tv_all.append(self.model.diffusion_MM.sample(pos_g.shape, labels_gen, flag=3)[-1])
 
 
-            # 计算 L_NEG
-            L_NEG = 0.0
-            for hard_neg in Q_diff:
-                mf_neg, _, _ = self.model.bpr_loss(u_g, pos_g, hard_neg)
-                L_NEG += mf_neg
-            if len(Q_diff) > 0:
-                L_NEG /= len(Q_diff)
-            if epoch<S:
-                L_NEG = 0.0
+                with torch.no_grad(): 
+                    # 计算余弦相似度
+                    u_norm = F.normalize(u_g, dim=1)             # [B, D]
+                    pos_norm = F.normalize(pos_g, dim=1)
+                    for vneg, tneg, tvneg in zip(O_v_all, O_t_all, O_tv_all):
+                        vneg_norm = F.normalize(vneg, dim=1)
+                        tneg_norm = F.normalize(tneg, dim=1)
+                        tvneg_norm = F.normalize(tvneg, dim=1)
+                        cos_sim_pos_list.extend((u_norm * pos_norm).sum(dim=1).cpu().numpy())
+                        cos_sim_vneg_list.extend((u_norm * vneg_norm).sum(dim=1).cpu().numpy())
+                        cos_sim_tneg_list.extend((u_norm * tneg_norm).sum(dim=1).cpu().numpy())
+                        cos_sim_tvneg_list.extend((u_norm * tvneg_norm).sum(dim=1).cpu().numpy())
+
+                # 动态难度调度
+                Q_diff = O_v_all + O_t_all + O_tv_all
+                Q_diff = Q_diff[:g(epoch+1)]
+
+
+                # 计算 L_NEG
+                # L_NEG = 0.0
+                for hard_neg in Q_diff:
+                    mf_neg, _, _ = self.model.bpr_loss(u_g, pos_g, hard_neg)
+                    L_NEG += mf_neg
+                if len(Q_diff) > 0:
+                    L_NEG /= len(Q_diff)
+                if epoch<S:
+                    L_NEG = 0.0
 
             # 总损失
             # [修改] 加入 UFNRec 的 loss

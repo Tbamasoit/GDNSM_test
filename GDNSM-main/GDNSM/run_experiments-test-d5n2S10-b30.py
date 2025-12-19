@@ -12,20 +12,22 @@ BASE_CMD = "python GDNSM-main/GDNSM/main.py --dataset baby"
 # 2. 定义你要搜索的参数空间 (Grid Search)
 # 脚本会自动生成这些列表的【笛卡尔积】组合
 param_grid = {
-    'd_epoch': [1,3],          # UFN 挖掘阈值
-    'beta': [1, 0.1, 0.001],     # UFN Loss 权重
-    'num_generated_neg':[3,5,8],    # 每个正样本生成负样本数量
-    'smoothing_S': [10,20,30]
-    # 'cfg_scale_text': [1.0, 1.1],       # UFN 介入时机
-    # 'cfg_scale_visual': [1.0, 1.1],          # Teacher EMA 衰减
-    # 'smoothing_S':[10,9],
+    'reverse': [1, 2],          # UFN 挖掘阈值
+    'lbd': [0.1, 0.5],     # UFN Loss 权重
+    'ufn_warmup': [ 3, 5],       # UFN 介入时机
+    'decay': [0.999],           # Teacher EMA 衰减
+    'smoothing_S':[10, 20],
+    'num_generated_neg':[2, 3, 5],
+    'd_epoch':[1,3],
+    'beta':[1,0.1],
+    
     
     # 你还可以加 GDNSM 的参数
     # 'sched_S': [10, 20, 30], 
 }
 
 # 3. 日志文件名
-LOG_FILE = "experiment_log_DM.txt"
+LOG_FILE = "experiment_log_test_d5n2S10_b30.txt"
 
 # ===========================================
 
@@ -41,7 +43,37 @@ def get_combinations(grid):
 
 def run():
     # 生成所有实验组合
-    experiments = get_combinations(param_grid)
+    experiments = [
+        # # 第 1 组实验：我想试大一点的 beta 和 2 个负样本
+        # {
+        #     'reverse': 1, 'lbd': 0.1, 'ufn_warmup': 3, 'decay': 0.999, 
+        #     'smoothing_S': 10, 'num_generated_neg': 3, 'd_epoch': 3, 'beta': 1,'gamma':0
+        # },
+        
+        # # 第 2 组实验：我想试小一点的 beta 和 5 个负样本
+        # {
+        #     'reverse': 1, 'lbd': 0.1, 'ufn_warmup': 3, 'decay': 0.999, 
+        #     'smoothing_S': 10, 'num_generated_neg': 3, 'd_epoch': 3, 'beta': 1,'gamma':1
+        # },
+
+        # # 第 2 组实验：我想试小一点的 beta 和 5 个负样本
+        # {
+        #     'reverse': 1, 'lbd': 0.1, 'ufn_warmup': 3, 'decay': 0.999, 
+        #     'smoothing_S': 10, 'num_generated_neg': 3, 'd_epoch': 3, 'beta': 1,'gamma':2
+        # },
+        # #-------测试一下gamma的值
+
+        {
+            
+            'smoothing_S': 10, 'num_generated_neg': 2, 'd_epoch': 5, 'beta': 30,'gamma':0
+        },
+
+        
+       
+
+        
+        # ... 你可以继续添加任意多组 ...
+    ]
     total_exp = len(experiments)
     
     print(f"🚀 准备开始自动化实验，共计 {total_exp} 组任务...")

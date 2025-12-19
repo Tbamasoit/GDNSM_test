@@ -30,6 +30,8 @@ log/
 # 忽略 TensorBoard 日志文件夹
 runs/
 tensorboard_logs/
+experiments_log/
+GDNSM-main/GDNSM/run_experiments/
 
 # ------------------------------------
 # 数据文件
